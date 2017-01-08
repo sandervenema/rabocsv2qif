@@ -27,4 +27,5 @@ library
 Executable rabocsv2qif
     Main-is:        Main.hs
     Build-Depends:  base >= 3 && < 5
-    Other-modules:  Rabobank
+    Other-modules:  Rabobank,
+                    ListUtils

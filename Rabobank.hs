@@ -36,8 +36,7 @@ import Data.List (intercalate)
 import Data.List.Split (splitOn, splitPlaces)
 import Data.Maybe (fromJust, isJust)
 import Data.Time.Clock (getCurrentTime)
-import Data.Time.Format (formatTime)
-import System.Locale (defaultTimeLocale)
+import Data.Time.Format (formatTime, defaultTimeLocale)
 import Text.Printf (printf)
 
 -- |'Transaction' is the internal data structure used to represent a
