@@ -121,7 +121,7 @@ creditDebit amount transactiontype =
 baseName :: IO FilePath
 baseName = do
     now <- getCurrentTime
-    return $ "Rabobank_" ++ (formatTime defaultTimeLocale "%Y%m%d%H%M%S" now) ++ ".qif"
+    return $ "Rabobank_" ++ formatTime defaultTimeLocale "%Y%m%d%H%M%S" now ++ ".qif"
 
 -- |'qifHeader' returns the header at the start of the QIF file.
 qifHeader :: BL.ByteString
