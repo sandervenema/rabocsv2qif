@@ -4,13 +4,13 @@ The rabocsv2qif package, written in [Haskell](https://www.haskell.org/),
 exposes a library, Rabobank, and an executable tool named `rabocsv2qif`. With
 the executable you can quickly create a timestamped QIF file from a Rabobank
 CSV file with transactions. The library exposes a method, `toQif`, that can be
-used to create QIF data in code. It simply takes a `String` and returns a `String`.
+used to create QIF data in code. It simply takes a `ByteString` and returns
+a `ByteString`.
 
 This is a package I wrote years ago, and recently have reworked a bit to make
-it build again. When I wrote this, I was still a beginner in Haskell, and
-I think the API (and performance) can be greatly improved if I used
-`ByteString` or `Data.Text` as the data types for the `toQif` function, instead
-of the problematic default `String` type.
+it build again. When I wrote this, I was still a beginner in Haskell, and used
+the basic `String` type. I've now (in version 2.0.0) updated the API to use the
+`ByteString` string type for better performance.
 
 ## Documentation
 
@@ -23,7 +23,7 @@ Once built/installed, it should be as simple as:
 
     $ rabocsv2qif <input file here>
 
-where the input file is a Rabobank CSV file. It outputs a timestamped file in
+The input file is a Rabobank CSV file. It outputs a timestamped file in
 the current working directory with the transactions in QIF format.
 
 ## License
