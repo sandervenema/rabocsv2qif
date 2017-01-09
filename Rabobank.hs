@@ -35,7 +35,6 @@ import ListUtils (takeWhileIndex)
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Conversion as B
-import Data.Char (chr)
 import Data.List (intercalate)
 import Data.List.Split (splitPlaces)
 import Data.Maybe (fromJust, isJust)
@@ -46,11 +45,11 @@ import Text.Printf (printf)
 -- |'Transaction' is the internal data structure used to represent a
 -- transaction. CSV data is turned into Transactions, and then, using the
 -- accessor methods converted to a QIF representation.
-data Transaction = Transaction { date :: BL.ByteString          -- ^ The transaction date
-                               , amount :: Double               -- ^ The amount of the transaction
-                               , description :: BL.ByteString   -- ^ The transaction description
-                               , payee :: BL.ByteString         -- ^ The payee
-                               , accountNumber :: BL.ByteString -- ^ The account number
+data Transaction = Transaction { tDate :: BL.ByteString          -- ^ The transaction date
+                               , tAmount :: Double               -- ^ The amount of the transaction
+                               , tDescription :: BL.ByteString   -- ^ The transaction description
+                               , tPayee :: BL.ByteString         -- ^ The payee
+                               , tAccountNumber :: BL.ByteString -- ^ The account number
                                } deriving (Show)
 
 -- |'TransactionType' records whether a 'Transaction' has to be debited or
@@ -83,8 +82,8 @@ fileToTransactions = map fromJust . filter isJust . map rowToTransaction
 -- 'ByteString' with this data, separated by newlines, just what we need.
 transactionToQif :: Transaction -> BL.ByteString
 transactionToQif t = BL.intercalate "\n" [
-                            BL.cons 'P' (payee t), BL.cons 'M' (description t), BL.cons 'N' (accountNumber t), 
-                            BL.cons 'D' (date t), BL.cons 'T' (BL.pack (printf "%.2f" (amount t)))] `BL.append` "\n^"
+                            BL.cons 'P' (tPayee t), BL.cons 'M' (tDescription t), BL.cons 'N' (tAccountNumber t), 
+                            BL.cons 'D' (tDate t), BL.cons 'T' (BL.pack (printf "%.2f" (tAmount t)))] `BL.append` "\n^"
 
 -- |'rowToTransaction' turns a list of 'ByteString's to a 'Transaction'. It will
 -- apply all the necessary corrections and reformatting necessary to turn a row
@@ -95,9 +94,9 @@ rowToTransaction
         maybe Nothing 
               (\correctAmount -> Just (Transaction correctDate correctAmount correctDescription payee accountNumber))
               maybeAmount
-  where correctDate         = BL.pack $ intercalate "/" $ splitPlaces [4,2,2] $ BL.unpack date
-        maybeAmount         = maybe Nothing (\amount -> 
-                                    Just (creditDebit amount (toTransactionType debitcredit)))
+  where correctDate         = BL.pack $ intercalate "/" $ splitPlaces ([4,2,2] :: [Int]) $ BL.unpack date
+        maybeAmount         = maybe Nothing (\amt -> 
+                                    Just (creditDebit amt (toTransactionType debitcredit)))
                                     (B.fromByteString' amount :: Maybe Double)
         correctDescription  = BL.intercalate ", " descriptionfields
 rowToTransaction _ = Nothing

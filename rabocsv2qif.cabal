@@ -1,6 +1,6 @@
 Name:           rabocsv2qif
-Version:        2.0.1
-Synopsis   :    A library and program to create QIF files from Rabobank CSV exports.
+Version:        2.0.2
+Synopsis:       A library and program to create QIF files from Rabobank CSV exports.
 License:        GPL
 License-file:   LICENSE
 Author:         Sander Venema
@@ -24,9 +24,11 @@ library
                    , split >= 0.2.1.1
     Exposed-modules: Rabobank
     Other-modules:   ListUtils
+    ghc-options:     -Wall
 
 Executable rabocsv2qif
     Main-is:        Main.hs
     Build-Depends:  base >= 3 && < 5
     Other-modules:  Rabobank
                   , ListUtils
+    ghc-options:    -Wall
