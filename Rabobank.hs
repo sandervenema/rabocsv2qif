@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {- Rabobank - Convert Rabobank CSV exports to QIF files
    Copyright (C) 2012 Sander Venema <sander.venema@gmail.com>
 
@@ -24,16 +26,18 @@
 -- debited, account number, and the transaction date.
 --
 -- This module exports two functions namely 'toQif', which is the main function
--- that will take a String of Rabobank CSV data and returns a String with QIF
+-- that will take a ByteString of Rabobank CSV data and returns a ByteString with QIF
 -- data, and 'baseName', which will generate a filename for the export file
 -- based on current date and time.
 module Rabobank (toQif, baseName) where
 
 import ListUtils (takeWhileIndex)
 
+import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Conversion as B
 import Data.Char (chr)
 import Data.List (intercalate)
-import Data.List.Split (splitOn, splitPlaces)
+import Data.List.Split (splitPlaces)
 import Data.Maybe (fromJust, isJust)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime, defaultTimeLocale)
@@ -42,17 +46,17 @@ import Text.Printf (printf)
 -- |'Transaction' is the internal data structure used to represent a
 -- transaction. CSV data is turned into Transactions, and then, using the
 -- accessor methods converted to a QIF representation.
-data Transaction = Transaction { date :: String          -- ^ The transaction date
-                               , amount :: Double        -- ^ The amount of the transaction
-                               , description :: String   -- ^ The transaction description
-                               , payee :: String         -- ^ The payee
-                               , accountNumber :: String -- ^ The account number
+data Transaction = Transaction { date :: BL.ByteString          -- ^ The transaction date
+                               , amount :: Double               -- ^ The amount of the transaction
+                               , description :: BL.ByteString   -- ^ The transaction description
+                               , payee :: BL.ByteString         -- ^ The payee
+                               , accountNumber :: BL.ByteString -- ^ The account number
                                } deriving (Show)
 
 -- |'TransactionType' records whether a 'Transaction' has to be debited or
 -- credited. We use this data structure in the 'creditDebit' function to
 -- determine whether a transaction amount needs to be positive or negative. The
--- 'toTransactionType' function turns a String containing "D" or "C" into a
+-- 'toTransactionType' function turns a ByteString containing "D" or "C" into a
 -- 'TransactionType'.
 data TransactionType = D -- ^ Debit
                      | C -- ^ Credit
@@ -60,44 +64,49 @@ data TransactionType = D -- ^ Debit
 
 -- |This function turns a string containing Rabobank CSV data to a string
 -- containing QIF data, ready for writing to stdout or to a file.
-toQif :: String -> String
-toQif file = qifHeader ++ unlines (map transactionToQif (fileToTransactions records))
-    where rows       = lines $ filter (/= '"') file
-          rawRecords = map (splitOn ",") rows
+toQif :: BL.ByteString -> BL.ByteString
+toQif file = BL.append qifHeader $ BL.unlines (map transactionToQif (fileToTransactions records))
+    where rows       = BL.lines $ BL.filter (/= '"') file
+          rawRecords = map (BL.split ',') rows
           records    = map (takeWhileIndex [2,3,4,5,6,10,11,12,13,14,15]) 
                             (filter (\x -> length x == 19) rawRecords)
 
--- |Turns a list of a list of list of a list of 'String's into a list of
+-- |Turns a list of a list of list of a list of 'ByteString's into a list of
 -- 'Transaction's.
-fileToTransactions :: [[String]] -> [Transaction]
+fileToTransactions :: [[BL.ByteString]] -> [Transaction]
 fileToTransactions = map fromJust . filter isJust . map rowToTransaction
 
--- |'transactionToQif' will turn a 'Transaction' into a 'String' suitable
+-- |'transactionToQif' will turn a 'Transaction' into a 'ByteString' suitable
 -- for QIF files. We simply call the accessor methods of the 'Transaction'
 -- type, prefix them with the appropriate prefix letters as required by the QIF
 -- specification, and then intercalate then with newlines, thereby returning a
--- 'String' with this data, separated by newlines, just what we need.
-transactionToQif :: Transaction -> String
-transactionToQif t = intercalate "\n" ['P':payee t, 'M': description t, 'N':accountNumber t, 
-                                  'D':date t, 'T':printf "%.2f" (amount t)] ++ "\n^"
+-- 'ByteString' with this data, separated by newlines, just what we need.
+transactionToQif :: Transaction -> BL.ByteString
+transactionToQif t = BL.intercalate "\n" [
+                            BL.cons 'P' (payee t), BL.cons 'M' (description t), BL.cons 'N' (accountNumber t), 
+                            BL.cons 'D' (date t), BL.cons 'T' (BL.pack (printf "%.2f" (amount t)))] `BL.append` "\n^"
 
--- |'rowToTransaction' turns a list of 'String's to a 'Transaction'. It will
+-- |'rowToTransaction' turns a list of 'ByteString's to a 'Transaction'. It will
 -- apply all the necessary corrections and reformatting necessary to turn a row
 -- into a correct 'Transaction' for use with 'transactionToQif'.
-rowToTransaction :: [String] -> Maybe Transaction
+rowToTransaction :: [BL.ByteString] -> Maybe Transaction
 rowToTransaction
     (date:debitcredit:amount:accountNumber:payee:descriptionfields) =
-        Just (Transaction correctDate correctAmount correctDescription payee accountNumber)
-  where correctDate         = intercalate "/" $ splitPlaces [4,2,2] date
-        correctAmount       = creditDebit (read amount :: Double) (toTransactionType debitcredit)
-        correctDescription  = intercalate ", " descriptionfields
+        maybe Nothing 
+              (\correctAmount -> Just (Transaction correctDate correctAmount correctDescription payee accountNumber))
+              maybeAmount
+  where correctDate         = BL.pack $ intercalate "/" $ splitPlaces [4,2,2] $ BL.unpack date
+        maybeAmount         = maybe Nothing (\amount -> 
+                                    Just (creditDebit amount (toTransactionType debitcredit)))
+                                    (B.fromByteString' amount :: Maybe Double)
+        correctDescription  = BL.intercalate ", " descriptionfields
 rowToTransaction _ = Nothing
 
--- |Helper function to turn a 'String' containing "D" or something else into a
+-- |Helper function to turn a 'ByteString' containing "D" or something else into a
 -- 'TransactionType'. This is used for 'creditDebit' to determine if an amount
 -- should be positive (added to the account) or negative (subtracted from the
 -- account.
-toTransactionType :: String -> TransactionType
+toTransactionType :: BL.ByteString -> TransactionType
 toTransactionType c = if c == "D" then D else C
 
 -- |'creditDebit' will make the given amount negative if 'transactiontype' == D
@@ -106,15 +115,15 @@ creditDebit :: Double -> TransactionType -> Double
 creditDebit amount transactiontype = 
     if transactiontype == D then -1 * amount else amount 
 
--- |'baseName' gets the current date and time and returns an 'IO String' with the
+-- |'baseName' gets the current date and time and returns an 'IO FilePath' with the
 -- timestamp and 'Rabobank_' as the prefix. This will be used as the filename
 -- (minus extension) for the exported QIF file.
-baseName :: IO String
+baseName :: IO FilePath
 baseName = do
     now <- getCurrentTime
-    return ("Rabobank_" ++ formatTime defaultTimeLocale "%Y%m%d%H%M%S" now ++ ".qif")
+    return $ "Rabobank_" ++ (formatTime defaultTimeLocale "%Y%m%d%H%M%S" now) ++ ".qif"
 
 -- |'qifHeader' returns the header at the start of the QIF file.
-qifHeader :: String
-qifHeader = "!Type:Bank\n"
+qifHeader :: BL.ByteString
+qifHeader = BL.pack "!Type:Bank\n"
 

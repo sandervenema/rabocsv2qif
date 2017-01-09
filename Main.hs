@@ -17,6 +17,8 @@
 module Main where
 
 import Rabobank (toQif, baseName)
+
+import qualified Data.ByteString.Lazy.Char8 as BL
 import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
@@ -26,9 +28,9 @@ main = do
     input <- getArgs
     case input of
         [fileName] -> do
-            file <- readFile fileName
+            file <- BL.readFile fileName
             outfile <- baseName -- creates a timestamped basename, with "Rabobank_" prefix
-            writeFile outfile (toQif file)
+            BL.writeFile outfile (toQif file)
 
         _ -> do
             name <- getProgName
